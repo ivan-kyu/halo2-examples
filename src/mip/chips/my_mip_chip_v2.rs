@@ -5,7 +5,7 @@ use halo2_proofs::{
     plonk::*,
     poly::Rotation,
 };
-use std::{marker::PhantomData, path};
+use std::{marker::PhantomData, path, println};
 
 #[derive(Debug, Clone)]
 pub struct MyMIPConfigV2 {
@@ -79,12 +79,12 @@ impl<F: FieldExt> MyMIPChipV2<F> {
     pub fn load_private(
         &self,
         mut layouter: impl Layouter<F>,
-        input: Value<F>,
+        start_leaf: Value<F>,
     ) -> Result<AssignedCell<F, F>, Error> {
         layouter.assign_region(
             || "load private",
             |mut region| {
-                region.assign_advice(|| "private input", self.config.advice[0], 0, || input)
+                region.assign_advice(|| "private input", self.config.advice[0], 0, || start_leaf)
             },
         )
     }
@@ -101,42 +101,42 @@ impl<F: FieldExt> MyMIPChipV2<F> {
     pub fn merkle_prove(
         &self,
         mut layouter: impl Layouter<F>,
-        leaf: &AssignedCell<F, F>,
+        start_leaf: &AssignedCell<F, F>,
         elements: &Vec<Value<F>>,
         indices: &Vec<Value<F>>,
     ) -> Result<AssignedCell<F, F>, Error> {
 
-        let mut leaf_or_digest = self.merkle_prove_layer(
-            layouter.namespace(|| "merkle_prove_layer_0"),
-            leaf,
+        let mut new_hash = self.merkle_prove_row(
+            layouter.namespace(|| "merkle_prove_row_0"),
+            start_leaf,
             elements[0],
             indices[0],
         )?;
 
         for i in 1..elements.len() {
-            leaf_or_digest = self.merkle_prove_layer(
-                layouter.namespace(|| format!("merkle_prove_layer_{}", i)),
-                &leaf_or_digest,
+            new_hash = self.merkle_prove_row(
+                layouter.namespace(|| format!("merkle_prove_row_{}", i)),
+                &new_hash,
                 elements[i],
                 indices[i],
             )?;
         }
-        Ok(leaf_or_digest)
+        Ok(new_hash)
     }
 
-    fn merkle_prove_layer(
+    fn merkle_prove_row(
         &self,
         mut layouter: impl Layouter<F>,
-        digest: &AssignedCell<F, F>,
+        leafhash: &AssignedCell<F, F>,
         element: Value<F>,
         index: Value<F>,
     ) -> Result<AssignedCell<F, F>, Error> {
         
         let (left, right) = layouter.assign_region(
-            || "merkle_prove_leaf",
+            || "merkle_prove_row",
             |mut region| {
                 // Row 0
-                digest.copy_advice(|| "digest", &mut region, self.config.advice[0], 0)?;
+                leafhash.copy_advice(|| "leafhash", &mut region, self.config.advice[0], 0)?;
                 region.assign_advice(|| "element", self.config.advice[1], 0, || element)?;
                 region.assign_advice(|| "index", self.config.advice[2], 0, || index)?;
 
@@ -144,9 +144,9 @@ impl<F: FieldExt> MyMIPChipV2<F> {
                 self.config.swap_selector.enable(&mut region, 0)?;
 
                 // Row 1
-                let digest_value = digest.value().map(|x| x.to_owned());
+                let leafhash_value = leafhash.value().map(|x| x.to_owned());
 
-                let (mut l, mut r) = (digest_value, element);
+                let (mut l, mut r) = (leafhash_value, element);
                 index.map(|x| {
                     (l, r) = if x == F::zero() { (l, r) } else { (r, l) };
                 });
@@ -159,7 +159,11 @@ impl<F: FieldExt> MyMIPChipV2<F> {
         )?;
 
         let hash2_chip = Hash2Chip::construct(self.config.hash2_config.clone());
-        let digest = hash2_chip.hash2(layouter.namespace(|| "hash2"), left, right)?;
-        Ok(digest)
+
+        let hashed = hash2_chip.hash2(layouter.namespace(|| "hash 2"), left, right)?;
+
+        println!("hashed: {:?}", hashed.value());
+
+        Ok(hashed)
     }
 }

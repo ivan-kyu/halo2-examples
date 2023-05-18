@@ -3,7 +3,7 @@ use halo2_proofs::{arithmetic::FieldExt, circuit::*, plonk::*};
 
 #[derive(Default)]
 struct MyMIPCircuitV2<F> {
-    pub leaf: Value<F>,
+    pub start_leaf: Value<F>,
     pub elements: Vec<Value<F>>,
     pub indices: Vec<Value<F>>,
 }
@@ -34,13 +34,13 @@ impl<F: FieldExt> Circuit<F> for MyMIPCircuitV2<F> {
     fn synthesize(&self, config: Self::Config, mut layouter: impl Layouter<F>) -> Result<(), Error> {
         let chip = MyMIPChipV2::construct(config);
         
-        let leaf_cell = chip.load_private(layouter.namespace(|| "load leaf"), self.leaf)?;
+        let start_leaf_cell = chip.load_private(layouter.namespace(|| "load start_leaf"), self.start_leaf)?;
 
-        chip.expose_public(layouter.namespace(|| "public leaf"), &leaf_cell, 0)?;
+        chip.expose_public(layouter.namespace(|| "public start_leaf"), &start_leaf_cell, 0)?;
 
         let digest = chip.merkle_prove(
             layouter.namespace(|| "merkle_prove"),
-            &leaf_cell,
+            &start_leaf_cell,
             &self.elements,
             &self.indices,
         )?;
@@ -58,13 +58,13 @@ mod tests {
     #[test]
     // #[cfg(feature = "dev-graph")]
     fn test_mymip_v2() {
-        let leaf = 1u64;
-        let elements = vec![1, 1, 1, 1];
-        let indices = vec![0, 1, 0, 1];
+        let start_leaf = 1;
+        let elements = vec![1, 2, 1, 2];
+        let indices = vec![0, 0, 0, 0];
 
-        let root: u64 = leaf + elements.iter().sum::<u64>();
+        let root: u64 = start_leaf + elements.iter().sum::<u64>();
 
-        let leaf_fp = Value::known(Fp::from(leaf));
+        let start_leaf_fp = Value::known(Fp::from(start_leaf));
         let elements_fp: Vec<Value<Fp>> = elements
             .iter()
             .map(|x| Value::known(Fp::from(x.to_owned())))
@@ -77,14 +77,51 @@ mod tests {
 
 
         let circuit = MyMIPCircuitV2 {
-            leaf: leaf_fp,
+            start_leaf: start_leaf_fp,
             elements: elements_fp,
             indices: indices_fp,
         };
         
-        let public_input = vec![Fp::from(leaf), Fp::from(root)];
-        let prover = MockProver::run(5, &circuit, vec![public_input.clone()]).unwrap();
+        let public_input = vec![Fp::from(start_leaf), Fp::from(root)];
+        let prover = MockProver::run(10, &circuit, vec![public_input.clone()]).unwrap();
+        
         prover.assert_satisfied();
+    }
 
+    #[cfg(feature = "dev-graph")]
+    #[test]
+    fn plot_mymip_v2() {
+
+        let start_leaf = 1;
+        let elements = vec![1, 1, 1, 1];
+        let indices = vec![0, 0, 0, 0];
+
+        let root: u64 = start_leaf + elements.iter().sum::<u64>();
+
+        let start_leaf_fp = Value::known(Fp::from(start_leaf));
+        let elements_fp: Vec<Value<Fp>> = elements
+            .iter()
+            .map(|x| Value::known(Fp::from(x.to_owned())))
+            .collect();
+        let indices_fp: Vec<Value<Fp>> = indices
+            .iter()
+            .map(|x| Value::known(Fp::from(x.to_owned())))
+            .collect();
+
+        let circuit = MyMIPCircuitV2 {
+            start_leaf: start_leaf_fp,
+            elements: elements_fp,
+            indices: indices_fp,
+        };
+
+
+        use plotters::prelude::*;
+        let root = BitMapBackend::new("mymip_v2-layout.png", (1024, 3096)).into_drawing_area();
+        root.fill(&WHITE).unwrap();
+        let root = root.titled("mymip_v2 Layout", ("sans-serif", 60)).unwrap();
+
+        halo2_proofs::dev::CircuitLayout::default()
+            .render(4, &circuit, &root)
+            .unwrap();
     }
 }

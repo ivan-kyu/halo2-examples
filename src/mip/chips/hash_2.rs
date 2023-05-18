@@ -103,17 +103,18 @@ impl<F: FieldExt> Hash2Chip<F> {
             || "hash2",
             |mut region| {
                 input_a.copy_advice(|| "input_a", &mut region, self.config.advice[0], 0)?;
-                input_b.copy_advice(|| "input_b", &mut region, self.config.advice[1], 0)?;
+                input_b.copy_advice(|| "input_b", &mut region, self.config.advice[1], 0)?;  
+
                 let output_cell = region.assign_advice(
                     || "output",
                     self.config.advice[2],
                     0,
                     || {
-                        input_a.value().map(|x| x.to_owned())
-                            + input_b.value().map(|x| x.to_owned())
+                        input_a.value().map(|x| x.to_owned()) + input_b.value().map(|x| x.to_owned())
                     },
                 )?;
                 self.config.hash_selector.enable(&mut region, 0)?;
+                
                 Ok(output_cell)
             },
         )
