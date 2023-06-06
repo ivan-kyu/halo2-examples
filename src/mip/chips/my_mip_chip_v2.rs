@@ -135,15 +135,27 @@ impl<F: FieldExt> MyMIPChipV2<F> {
         let (left, right) = layouter.assign_region(
             || "merkle_prove_row",
             |mut region| {
-                // Row 0
-                leafhash.copy_advice(|| "leafhash", &mut region, self.config.advice[0], 0)?;
+                // Row 0 (in the layout!!)
+                // plot col 1
+                leafhash.copy_advice(
+                    || "leafhash", 
+                    &mut region, 
+                    self.config.advice[0], 
+                    0)?;
+                // plot col 2
                 region.assign_advice(|| "element", self.config.advice[1], 0, || element)?;
+                // plot col 3
                 region.assign_advice(|| "index", self.config.advice[2], 0, || index)?;
 
+
+                // plot col 4 ??
                 self.config.bool_selector.enable(&mut region, 0)?;
+                // plot col 5 ??
                 self.config.swap_selector.enable(&mut region, 0)?;
 
-                // Row 1
+
+
+                // Row 1 (in the layout!!)
                 let leafhash_value = leafhash.value().map(|x| x.to_owned());
 
                 let (mut l, mut r) = (leafhash_value, element);
@@ -151,16 +163,35 @@ impl<F: FieldExt> MyMIPChipV2<F> {
                     (l, r) = if x == F::zero() { (l, r) } else { (r, l) };
                 });
 
-                let left = region.assign_advice(|| "left", self.config.advice[0], 1, || l)?;
-                let right = region.assign_advice(|| "right", self.config.advice[1], 1, || r)?;
+                // plot col 1 // offset 1
+                let left = region
+                    .assign_advice(
+                        || "left", 
+                        self.config.advice[0], 
+                        1, 
+                        || l)?;
+                
+                // plot col 2 // offset 1
+                let right = region
+                    .assign_advice(
+                        || "right", 
+                        self.config.advice[1], 
+                        1, 
+                        || r)?;
 
                 Ok((left, right))
             },
         )?;
 
+        print!("left: {:?}, right: {:?}", left.value(), right.value());
+
         let hash2_chip = Hash2Chip::construct(self.config.hash2_config.clone());
 
-        let hashed = hash2_chip.hash2(layouter.namespace(|| "hash 2"), left, right)?;
+        let hashed = 
+            hash2_chip.hash2(
+                layouter.namespace(|| "hash 2"), 
+                left, 
+                right)?;
 
         println!("hashed: {:?}", hashed.value());
 

@@ -1,3 +1,5 @@
+use std::print;
+
 use super::super::chips::my_mip_chip_v2::{MyMIPChipV2, MyMIPConfigV2};
 use halo2_proofs::{arithmetic::FieldExt, circuit::*, plonk::*};
 
@@ -34,7 +36,7 @@ impl<F: FieldExt> Circuit<F> for MyMIPCircuitV2<F> {
     fn synthesize(&self, config: Self::Config, mut layouter: impl Layouter<F>) -> Result<(), Error> {
         let chip = MyMIPChipV2::construct(config);
         
-        let start_leaf_cell = chip.load_private(layouter.namespace(|| "load start_leaf"), self.start_leaf)?;
+        let start_leaf_cell: AssignedCell<F, F> = chip.load_private(layouter.namespace(|| "load start_leaf"), self.start_leaf)?;
 
         chip.expose_public(layouter.namespace(|| "public start_leaf"), &start_leaf_cell, 0)?;
 
@@ -45,7 +47,9 @@ impl<F: FieldExt> Circuit<F> for MyMIPCircuitV2<F> {
             &self.indices,
         )?;
 
-        chip.expose_public(layouter.namespace(|| "public root"), &digest, 1)?;
+        print!("digest: {:?}", digest);
+
+        chip.expose_public(layouter.namespace(|| "public root"), &digest, self.elements.len())?;
 
         Ok(())
     }
@@ -59,8 +63,8 @@ mod tests {
     // #[cfg(feature = "dev-graph")]
     fn test_mymip_v2() {
         let start_leaf = 1;
-        let elements = vec![1, 2, 1, 2];
-        let indices = vec![0, 0, 0, 0];
+        let elements = vec![1, 1, 1, 1, 1, 1];
+        let indices = vec![0, 1, 0, 1, 0, 1];
 
         let root: u64 = start_leaf + elements.iter().sum::<u64>();
 
@@ -83,7 +87,7 @@ mod tests {
         };
         
         let public_input = vec![Fp::from(start_leaf), Fp::from(root)];
-        let prover = MockProver::run(10, &circuit, vec![public_input.clone()]).unwrap();
+        let prover = MockProver::run(5, &circuit, vec![public_input.clone()]).unwrap();
         
         prover.assert_satisfied();
     }
@@ -93,8 +97,8 @@ mod tests {
     fn plot_mymip_v2() {
 
         let start_leaf = 1;
-        let elements = vec![1, 1, 1, 1];
-        let indices = vec![0, 0, 0, 0];
+        let elements = vec![1, 1, 1, 1, 1];
+        let indices = vec![0, 0, 0, 0, 0];
 
         let root: u64 = start_leaf + elements.iter().sum::<u64>();
 
@@ -116,7 +120,7 @@ mod tests {
 
 
         use plotters::prelude::*;
-        let root = BitMapBackend::new("mymip_v2-layout.png", (1024, 3096)).into_drawing_area();
+        let root = BitMapBackend::new("mymip_v2-layout.png", (1024, 2048)).into_drawing_area();
         root.fill(&WHITE).unwrap();
         let root = root.titled("mymip_v2 Layout", ("sans-serif", 60)).unwrap();
 

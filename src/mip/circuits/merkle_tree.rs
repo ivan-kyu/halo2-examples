@@ -1,4 +1,4 @@
-use crate::poseidon::FieldHasherGadget;
+use poseidon::FieldHasherGadget;
 use ark_ec::models::TEModelParameters;
 use ark_ff::PrimeField;
 use ark_std::marker::PhantomData;

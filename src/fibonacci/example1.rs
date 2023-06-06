@@ -70,14 +70,14 @@ impl<F: FieldExt> FibonacciChip<F> {
                 let a_cell = region.assign_advice_from_instance(
                     || "f(0)",
                     self.config.instance,
-                    0,
+                    0, // f(0) is the first element in the instance column
                     self.config.col_a,
                     0)?;
 
                 let b_cell = region.assign_advice_from_instance(
                     || "f(1)",
                     self.config.instance,
-                    1,
+                    1, // f(1) is the second element in the instance column
                     self.config.col_b,
                     0)?;
 
@@ -85,7 +85,7 @@ impl<F: FieldExt> FibonacciChip<F> {
                     || "a + b",
                     self.config.col_c,
                     0,
-                    || a_cell.value().copied() + b_cell.value(),
+                    || a_cell.value().copied() + b_cell.value(), // take this and assign to self.config.col_c
                 )?;
 
                 Ok((a_cell, b_cell, c_cell))

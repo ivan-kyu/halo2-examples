@@ -102,9 +102,12 @@ impl<F: FieldExt> Hash2Chip<F> {
         layouter.assign_region(
             || "hash2",
             |mut region| {
+                // plot col 1
                 input_a.copy_advice(|| "input_a", &mut region, self.config.advice[0], 0)?;
+                // plot col 2
                 input_b.copy_advice(|| "input_b", &mut region, self.config.advice[1], 0)?;  
 
+                // // plot col 3
                 let output_cell = region.assign_advice(
                     || "output",
                     self.config.advice[2],
@@ -113,7 +116,9 @@ impl<F: FieldExt> Hash2Chip<F> {
                         input_a.value().map(|x| x.to_owned()) + input_b.value().map(|x| x.to_owned())
                     },
                 )?;
-                self.config.hash_selector.enable(&mut region, 0)?;
+
+                // // plot col 4
+                // self.config.hash_selector.enable(&mut region, 0)?;
                 
                 Ok(output_cell)
             },
